@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useGameStore, Coordinates, Direction } from '../store/gameStore';
 import { AISnake } from '../services/aiSnake';
+import { Algorithm } from '../services/algorithms/AlgorithmFactory';
 
 const AIPlay = () => {
   const navigate = useNavigate();
@@ -79,7 +80,7 @@ const AIPlay = () => {
   const [, forceRender] = useState(0);
   
   // Add algorithm choices
-  const [algorithm, setAlgorithm] = useState<'astar' | 'bfs' | 'greedy' | 'dijkstra' | 'hamiltonian'>('astar');
+  const [algorithm, setAlgorithm] = useState<Algorithm>('astar');
 
   // Add a debug state to help track the snake
   const [debugInfo, setDebugInfo] = useState<{
