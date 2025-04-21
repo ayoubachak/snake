@@ -79,13 +79,26 @@ const AIPlay = () => {
   const [, forceRender] = useState(0);
   
   // Add algorithm choices
-  const [algorithm, setAlgorithm] = useState<'astar' | 'bfs' | 'greedy' | 'dijkstra'>('astar');
+  const [algorithm, setAlgorithm] = useState<'astar' | 'bfs' | 'greedy' | 'dijkstra' | 'hamiltonian'>('astar');
 
   // Add a debug state to help track the snake
   const [debugInfo, setDebugInfo] = useState<{
     snakeLength: number;
     headPosition: { x: number, y: number } | null;
   }>({ snakeLength: 0, headPosition: null });
+
+  // State to store Hamiltonian cycle for visualization
+  const [hamiltonianCycle, setHamiltonianCycle] = useState<Coordinates[]>([]);
+  
+  // Advanced configuration states
+  const [showPath, setShowPath] = useState<boolean>(true);
+  const [showHamiltonianCycle, setShowHamiltonianCycle] = useState<boolean>(true);
+  const [showDebugInfo, setShowDebugInfo] = useState<boolean>(true);
+  const [aStarHeuristicWeight, setAStarHeuristicWeight] = useState<number>(1.0);
+  const [activeTab, setActiveTab] = useState<'algorithm' | 'speed' | 'visualization'>('algorithm');
+  const [shortcutThreshold, setShortcutThreshold] = useState<number>(33); // % of board size where shortcuts are always safe
+  const [pathColor, setPathColor] = useState<string>(currentTheme.path);
+  const [cycleOpacity, setCycleOpacity] = useState<number>(0.1);
 
   // Add effect to track snake changes for debugging
   useEffect(() => {
@@ -100,10 +113,46 @@ const AIPlay = () => {
   // Initialize AI snake when game starts
   useEffect(() => {
     if (isPlaying && !aiSnake) {
-      const ai = new AISnake(boardSize, snake, food, obstacles, algorithm);
+      const ai = new AISnake(
+        boardSize, 
+        snake, 
+        food, 
+        obstacles, 
+        algorithm, 
+        {
+          heuristicWeight: aStarHeuristicWeight,
+          shortcutThreshold: shortcutThreshold
+        }
+      );
       setAISnake(ai);
     }
-  }, [isPlaying, boardSize, snake, food, obstacles, algorithm]);
+  }, [isPlaying, boardSize, snake, food, obstacles, algorithm, aStarHeuristicWeight, shortcutThreshold]);
+
+  // Update AI when algorithm changes
+  useEffect(() => {
+    if (isPlaying && aiSnake) {
+      // Recreate AI snake with new algorithm
+      const ai = new AISnake(
+        boardSize, 
+        snake, 
+        food, 
+        obstacles, 
+        algorithm,
+        {
+          heuristicWeight: aStarHeuristicWeight,
+          shortcutThreshold: shortcutThreshold
+        }
+      );
+      setAISnake(ai);
+      
+      // Get Hamiltonian cycle for visualization if applicable
+      if (algorithm === 'hamiltonian') {
+        setHamiltonianCycle(ai.getHamiltonianCycle());
+      } else {
+        setHamiltonianCycle([]);
+      }
+    }
+  }, [algorithm, isPlaying, boardSize, snake, food, obstacles, aStarHeuristicWeight, shortcutThreshold]);
 
   // Update AI when game state changes
   useEffect(() => {
@@ -112,21 +161,17 @@ const AIPlay = () => {
       const path = aiSnake.getPath();
       setAIPath(path);
       
+      // Update Hamiltonian cycle if needed
+      if (algorithm === 'hamiltonian') {
+        setHamiltonianCycle(aiSnake.getHamiltonianCycle());
+      }
+      
       const nextDirection = aiSnake.getNextDirection();
       if (nextDirection) {
         setDirection(nextDirection);
       }
     }
-  }, [isPlaying, snake, food, obstacles, aiSnake, setDirection]);
-
-  // Update AI when algorithm changes
-  useEffect(() => {
-    if (isPlaying && aiSnake) {
-      // Recreate AI snake with new algorithm
-      const ai = new AISnake(boardSize, snake, food, obstacles, algorithm);
-      setAISnake(ai);
-    }
-  }, [algorithm, isPlaying]);
+  }, [isPlaying, snake, food, obstacles, aiSnake, setDirection, algorithm]);
 
   // Game loop with speed control
   useEffect(() => {
@@ -216,8 +261,8 @@ const AIPlay = () => {
     }
     
     // Draw AI path
-    if (isPlaying && aiPath.length > 0) {
-      ctx.strokeStyle = currentTheme.path;
+    if (isPlaying && aiPath.length > 0 && showPath) {
+      ctx.strokeStyle = pathColor;
       ctx.lineWidth = 2;
       ctx.beginPath();
       
@@ -239,6 +284,51 @@ const AIPlay = () => {
         
         ctx.stroke();
       }
+    }
+    
+    // Draw Hamiltonian cycle when using that algorithm
+    if (isPlaying && algorithm === 'hamiltonian' && hamiltonianCycle.length > 0 && showHamiltonianCycle) {
+      ctx.strokeStyle = `rgba(255, 255, 255, ${cycleOpacity})`; // Configurable opacity
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      
+      // Start from the first cell in the cycle
+      const firstCell = hamiltonianCycle[0];
+      ctx.moveTo(
+        (firstCell.x + 0.5) * cellSizeValue,
+        (firstCell.y + 0.5) * cellSizeValue
+      );
+      
+      // Draw entire cycle
+      hamiltonianCycle.forEach((point, index) => {
+        if (index > 0) { // Skip first point which is where we started
+          ctx.lineTo(
+            (point.x + 0.5) * cellSizeValue,
+            (point.y + 0.5) * cellSizeValue
+          );
+        }
+      });
+      
+      // Connect back to first cell to complete the cycle
+      ctx.lineTo(
+        (firstCell.x + 0.5) * cellSizeValue,
+        (firstCell.y + 0.5) * cellSizeValue
+      );
+      
+      ctx.stroke();
+      
+      // Optionally, draw dots at each cell to make the cycle more visible
+      ctx.fillStyle = `rgba(255, 255, 255, ${cycleOpacity})`;
+      hamiltonianCycle.forEach(point => {
+        ctx.beginPath();
+        ctx.arc(
+          (point.x + 0.5) * cellSizeValue,
+          (point.y + 0.5) * cellSizeValue,
+          cellSizeValue * 0.1, // Small dot
+          0, Math.PI * 2
+        );
+        ctx.fill();
+      });
     }
     
     // Draw obstacles
@@ -365,15 +455,16 @@ const AIPlay = () => {
     }
     
     // Draw debug information
-    if (isPlaying && debugInfo.headPosition) {
+    if (isPlaying && debugInfo.headPosition && showDebugInfo) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
       ctx.font = '12px Arial';
       ctx.fillText(`Snake Length: ${debugInfo.snakeLength}`, 10, 20);
       ctx.fillText(`Head: (${debugInfo.headPosition.x}, ${debugInfo.headPosition.y})`, 10, 40);
       ctx.fillText(`Direction: ${direction}`, 10, 60);
+      ctx.fillText(`Algorithm: ${algorithm.toUpperCase()}`, 10, 80);
     }
     
-  }, [snake, food, obstacles, boardSize, currentTheme, aiPath, isPlaying, direction, debugInfo]);
+  }, [snake, food, obstacles, boardSize, currentTheme, aiPath, isPlaying, direction, debugInfo, showPath, showHamiltonianCycle, cycleOpacity, pathColor]);
 
   // Helper functions for rendering
   const shadeColor = (color: string, percent: number): string => {
@@ -477,6 +568,68 @@ const AIPlay = () => {
     }
   }, [snake, isPlaying]);
 
+  // Helper function for rendering sliders
+  const renderSlider = (
+    label: string, 
+    value: number, 
+    onChange: (value: number) => void, 
+    min: number, 
+    max: number, 
+    step: number, 
+    tooltip?: string
+  ) => (
+    <div className="w-full mb-3">
+      <div className="flex justify-between items-center mb-1">
+        <label className="text-gray-300 text-sm">
+          {label}
+          {tooltip && (
+            <span 
+              className="ml-1 text-gray-500 cursor-help"
+              title={tooltip}
+            >
+              ⓘ
+            </span>
+          )}
+        </label>
+        <span className="text-white text-sm font-mono">{value}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+      />
+    </div>
+  );
+
+  // Helper function for rendering color pickers
+  const renderColorPicker = (
+    label: string, 
+    value: string, 
+    onChange: (value: string) => void
+  ) => (
+    <div className="w-full mb-3">
+      <div className="flex justify-between items-center mb-1">
+        <label className="text-gray-300 text-sm">{label}</label>
+        <div className="flex items-center">
+          <div 
+            className="w-4 h-4 rounded-full mr-2" 
+            style={{ backgroundColor: value }}
+          />
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-8 h-6"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <motion.div
       className="flex flex-col items-center justify-start min-h-screen p-2 bg-gray-900 w-full max-w-full"
@@ -552,50 +705,280 @@ const AIPlay = () => {
           )}
         </div>
         
-        {/* AI Controls */}
+        {/* Enhanced AI Controls with Tabs */}
         <div className="w-full max-w-screen-xl mx-auto mt-3 bg-gray-800 p-3 rounded-lg">
-          <div className="flex flex-col md:flex-row justify-between">
-            {/* Algorithm Select */}
-            <div className="mb-2 md:mb-0 md:mr-4">
-              <label className="text-gray-300 block mb-1">Algorithm</label>
-              <div className="grid grid-cols-2 gap-1 md:grid-cols-4">
-                {(['astar', 'bfs', 'greedy', 'dijkstra'] as const).map((algo) => (
-                  <button
-                    key={algo}
-                    className={`px-2 py-1 text-sm rounded-md text-white ${
-                      algorithm === algo 
-                        ? 'bg-blue-600 font-semibold' 
-                        : 'bg-gray-700 hover:bg-gray-600'
-                    }`}
-                    onClick={() => setAlgorithm(algo)}
-                  >
-                    {algo === 'astar' ? 'A*' : 
-                     algo === 'bfs' ? 'BFS' : 
-                     algo === 'greedy' ? 'Greedy' : 'Dijkstra'}
-                  </button>
-                ))}
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-700 mb-3">
+            <button
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
+                activeTab === 'algorithm' 
+                  ? 'bg-gray-700 text-white' 
+                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+              onClick={() => setActiveTab('algorithm')}
+            >
+              Algorithm
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
+                activeTab === 'speed' 
+                  ? 'bg-gray-700 text-white' 
+                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+              onClick={() => setActiveTab('speed')}
+            >
+              Speed
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
+                activeTab === 'visualization' 
+                  ? 'bg-gray-700 text-white' 
+                  : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+              onClick={() => setActiveTab('visualization')}
+            >
+              Visualization
+            </button>
+          </div>
+          
+          {/* Tab Content */}
+          <div className="px-1">
+            {/* Algorithm Tab */}
+            {activeTab === 'algorithm' && (
+              <div>
+                {/* Algorithm Selection */}
+                <div className="mb-4">
+                  <label className="text-gray-300 block mb-2 font-medium">Algorithm Selection</label>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    {([
+                      { id: 'astar', label: 'A*', description: 'Balanced pathfinding with heuristic' },
+                      { id: 'bfs', label: 'BFS', description: 'Breadth-first search, finds shortest path' },
+                      { id: 'greedy', label: 'Greedy', description: 'Always moves toward food, may get trapped' },
+                      { id: 'dijkstra', label: 'Dijkstra', description: 'Exhaustive search for shortest path' },
+                      { id: 'hamiltonian', label: 'Hamiltonian', description: 'Guaranteed to win but slower' }
+                    ] as const).map((algo) => (
+                      <div 
+                        key={algo.id}
+                        className={`p-3 rounded-lg cursor-pointer transition-all ${
+                          algorithm === algo.id
+                            ? 'bg-blue-600 shadow-lg transform scale-105'
+                            : 'bg-gray-700 hover:bg-gray-600'
+                        }`}
+                        onClick={() => setAlgorithm(algo.id)}
+                      >
+                        <div className="font-semibold text-white">{algo.label}</div>
+                        <div className="text-xs text-gray-300 mt-1">{algo.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Algorithm-specific configuration */}
+                <div className="mb-4">
+                  <h3 className="text-gray-300 mb-3 font-medium">Algorithm Configuration</h3>
+                  
+                  {algorithm === 'astar' && (
+                    <div>
+                      {renderSlider(
+                        "Heuristic Weight", 
+                        aStarHeuristicWeight, 
+                        setAStarHeuristicWeight, 
+                        0.1, 
+                        5.0, 
+                        0.1, 
+                        "Higher values make the path more direct but may not be optimal"
+                      )}
+                      <div className="text-xs text-gray-400 mt-1">
+                        A* balances between Dijkstra (weight=0) and Greedy (weight=∞).
+                        Adjust the weight to control how strongly the algorithm favors paths toward the goal.
+                      </div>
+                    </div>
+                  )}
+                  
+                  {algorithm === 'hamiltonian' && (
+                    <div>
+                      {renderSlider(
+                        "Shortcut Threshold (%)", 
+                        shortcutThreshold, 
+                        setShortcutThreshold, 
+                        0, 
+                        100, 
+                        1, 
+                        "% of board size where shortcuts are always considered safe"
+                      )}
+                      <div className="text-xs text-gray-400 mt-1">
+                        The Hamiltonian algorithm creates a path that visits every cell exactly once,
+                        but can take shortcuts when safe. Higher values make the AI more aggressive
+                        in taking shortcuts when the snake is small.
+                      </div>
+                    </div>
+                  )}
+                  
+                  {algorithm === 'greedy' && (
+                    <div className="text-xs text-gray-400">
+                      Greedy always chooses the move that brings it closest to the food.
+                      This can be fast but may lead to trapping itself.
+                    </div>
+                  )}
+                  
+                  {algorithm === 'bfs' && (
+                    <div className="text-xs text-gray-400">
+                      BFS (Breadth-First Search) explores all possible paths layer by layer,
+                      guaranteeing the shortest path to the food if one exists.
+                    </div>
+                  )}
+                  
+                  {algorithm === 'dijkstra' && (
+                    <div className="text-xs text-gray-400">
+                      Dijkstra's algorithm explores all possible paths, prioritizing the shortest ones.
+                      It's very thorough but slower than other algorithms.
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             
-            {/* Speed Control */}
-            <div>
-              <label className="text-gray-300 block mb-1">Speed</label>
-              <div className="grid grid-cols-3 gap-1 md:grid-cols-7">
-                {(['very-slow', 'slow', 'normal', 'fast', 'very-fast', 'turbo', 'instant'] as const).map((speedOption) => (
-                  <button
-                    key={speedOption}
-                    className={`px-2 py-1 text-sm rounded-md text-white ${
-                      speed === speedOption 
-                        ? 'bg-green-600 font-semibold' 
-                        : 'bg-gray-700 hover:bg-gray-600'
-                    }`}
-                    onClick={() => setSpeed(speedOption)}
-                  >
-                    {speedOption.replace('-', ' ')}
-                  </button>
-                ))}
+            {/* Speed Tab */}
+            {activeTab === 'speed' && (
+              <div>
+                <label className="text-gray-300 block mb-2 font-medium">Game Speed</label>
+                
+                {/* Visual Speed Selection */}
+                <div className="grid grid-cols-7 gap-1 mb-3">
+                  {([
+                    { id: 'very-slow', label: 'Very Slow', ms: 300 },
+                    { id: 'slow', label: 'Slow', ms: 200 },
+                    { id: 'normal', label: 'Normal', ms: 150 },
+                    { id: 'fast', label: 'Fast', ms: 100 },
+                    { id: 'very-fast', label: 'Very Fast', ms: 50 },
+                    { id: 'turbo', label: 'Turbo', ms: 25 },
+                    { id: 'instant', label: 'Instant', ms: 5 }
+                  ] as const).map((speedOption) => (
+                    <button
+                      key={speedOption.id}
+                      className={`px-2 py-3 text-sm rounded-md text-white ${
+                        speed === speedOption.id 
+                          ? 'bg-green-600 font-semibold' 
+                          : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                      onClick={() => setSpeed(speedOption.id)}
+                    >
+                      <div className="text-xs md:text-sm">{speedOption.label}</div>
+                      <div className="text-xs text-gray-300 mt-1 hidden md:block">{speedOption.ms}ms</div>
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Speed details */}
+                <div className="bg-gray-700 p-3 rounded-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-white text-sm font-medium mb-1">Current Speed</h4>
+                      <div className="text-green-500 text-lg font-mono">
+                        {({
+                          'very-slow': '300ms',
+                          'slow': '200ms',
+                          'normal': '150ms',
+                          'fast': '100ms',
+                          'very-fast': '50ms',
+                          'turbo': '25ms',
+                          'instant': '5ms'
+                        } as const)[speed]}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Time between moves
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-white text-sm font-medium mb-1">Algorithm</h4>
+                      <div className="text-blue-500 text-lg capitalize">
+                        {algorithm}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Current pathfinding method
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+            
+            {/* Visualization Tab */}
+            {activeTab === 'visualization' && (
+              <div>
+                <h3 className="text-gray-300 mb-3 font-medium">Visualization Settings</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-700 p-3 rounded-lg">
+                    <h4 className="text-white text-sm font-medium mb-2">Display Options</h4>
+                    
+                    {/* Toggle switches */}
+                    <div className="space-y-2">
+                      <label className="flex items-center justify-between cursor-pointer">
+                        <span className="text-gray-300 text-sm">Show Path</span>
+                        <div 
+                          className={`w-10 h-5 rounded-full ${showPath ? 'bg-blue-600' : 'bg-gray-600'} relative transition-colors`}
+                          onClick={() => setShowPath(!showPath)}
+                        >
+                          <div 
+                            className={`absolute w-4 h-4 rounded-full bg-white top-0.5 transition-all ${
+                              showPath ? 'right-0.5' : 'left-0.5'
+                            }`} 
+                          />
+                        </div>
+                      </label>
+                      
+                      <label className="flex items-center justify-between cursor-pointer">
+                        <span className="text-gray-300 text-sm">Show Hamiltonian Cycle</span>
+                        <div 
+                          className={`w-10 h-5 rounded-full ${showHamiltonianCycle ? 'bg-blue-600' : 'bg-gray-600'} relative transition-colors`}
+                          onClick={() => setShowHamiltonianCycle(!showHamiltonianCycle)}
+                        >
+                          <div 
+                            className={`absolute w-4 h-4 rounded-full bg-white top-0.5 transition-all ${
+                              showHamiltonianCycle ? 'right-0.5' : 'left-0.5'
+                            }`} 
+                          />
+                        </div>
+                      </label>
+                      
+                      <label className="flex items-center justify-between cursor-pointer">
+                        <span className="text-gray-300 text-sm">Show Debug Info</span>
+                        <div 
+                          className={`w-10 h-5 rounded-full ${showDebugInfo ? 'bg-blue-600' : 'bg-gray-600'} relative transition-colors`}
+                          onClick={() => setShowDebugInfo(!showDebugInfo)}
+                        >
+                          <div 
+                            className={`absolute w-4 h-4 rounded-full bg-white top-0.5 transition-all ${
+                              showDebugInfo ? 'right-0.5' : 'left-0.5'
+                            }`} 
+                          />
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gray-700 p-3 rounded-lg">
+                    <h4 className="text-white text-sm font-medium mb-2">Appearance</h4>
+                    
+                    {/* Color and opacity settings */}
+                    <div>
+                      {renderColorPicker("Path Color", pathColor, setPathColor)}
+                      
+                      {renderSlider(
+                        "Cycle Opacity", 
+                        cycleOpacity, 
+                        setCycleOpacity, 
+                        0.05, 
+                        0.5, 
+                        0.05
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
