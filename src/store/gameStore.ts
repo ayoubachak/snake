@@ -173,6 +173,9 @@ export const useGameStore = create<GameState>()(
       moveSnake: () => {
         const { snake, nextDirection, food, obstacles, boardSize } = get();
         
+        // Validate snake array at the beginning of moveSnake
+        console.log("Snake at start of moveSnake:", JSON.stringify(snake, null, 2));
+        
         // Update direction
         const direction = nextDirection;
         
@@ -230,7 +233,9 @@ export const useGameStore = create<GameState>()(
         
         // Check if food is eaten
         if (head.x === food.x && head.y === food.y) {
+          console.log('Food eaten! Snake before:', [...snake]);
           get().eatFood();
+          console.log('After eatFood. New head:', head, 'Snake length:', newSnake.length);
         } else {
           // Remove tail if food wasn't eaten
           newSnake.pop();
@@ -246,24 +251,35 @@ export const useGameStore = create<GameState>()(
           }
         });
         
+        console.log('moveSnake completed. New snake:', [...newSnake]);
+        
         set({ 
           snake: newSnake, 
           direction,
           animationInProgress: true
         });
+        
+        // Validate the snake array has been updated correctly
+        console.log("Updated snake AFTER set:", get().snake);
       },
       
       eatFood: () => {
         const { snake, obstacles, boardSize, score } = get();
         
+        console.log('eatFood called. Current snake:', [...snake]);
+        
         // Generate new food position
         const newFood = getRandomPosition(0, boardSize, [...snake, ...obstacles]);
+        
+        console.log('New food generated at:', newFood);
         
         // Increase score
         set({ 
           food: newFood,
           score: score + 10,
         });
+        
+        console.log('eatFood completed. Score:', score + 10);
       },
       
       gameOver: () => {

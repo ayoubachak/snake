@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, Coordinates, Direction } from '../store/gameStore';
 import { AISnake } from '../services/aiSnake';
 
 const AIPlay = () => {
@@ -29,6 +29,7 @@ const AIPlay = () => {
     pauseGame,
     resetGame,
     setDirection,
+    direction,
   } = useGameStore();
   
   // Theme settings
@@ -79,6 +80,22 @@ const AIPlay = () => {
   
   // Add algorithm choices
   const [algorithm, setAlgorithm] = useState<'astar' | 'bfs' | 'greedy' | 'dijkstra'>('astar');
+
+  // Add a debug state to help track the snake
+  const [debugInfo, setDebugInfo] = useState<{
+    snakeLength: number;
+    headPosition: { x: number, y: number } | null;
+  }>({ snakeLength: 0, headPosition: null });
+
+  // Add effect to track snake changes for debugging
+  useEffect(() => {
+    if (snake.length > 0) {
+      setDebugInfo({
+        snakeLength: snake.length,
+        headPosition: { x: snake[0].x, y: snake[0].y }
+      });
+    }
+  }, [snake]);
 
   // Initialize AI snake when game starts
   useEffect(() => {
@@ -136,13 +153,19 @@ const AIPlay = () => {
     };
   }, [isPlaying, speed, moveSnake]);
 
-  // Draw game on canvas
+  // Draw game on canvas with improved snake rendering
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    
+    // Log the snake array for debugging
+    console.log("Snake array in render:", snake);
+    if (!snake || snake.length === 0) {
+      console.warn("Empty snake array detected in render function!");
+    }
     
     // Canvas sizing - updated for centered full screen
     const viewportWidth = window.innerWidth;
@@ -199,21 +222,23 @@ const AIPlay = () => {
       ctx.beginPath();
       
       // Start from the snake's head
-      const head = snake[0];
-      ctx.moveTo(
-        (head.x + 0.5) * cellSizeValue,
-        (head.y + 0.5) * cellSizeValue
-      );
-      
-      // Draw path
-      aiPath.forEach(point => {
-        ctx.lineTo(
-          (point.x + 0.5) * cellSizeValue,
-          (point.y + 0.5) * cellSizeValue
+      if (snake.length > 0) {
+        const head = snake[0];
+        ctx.moveTo(
+          (head.x + 0.5) * cellSizeValue,
+          (head.y + 0.5) * cellSizeValue
         );
-      });
-      
-      ctx.stroke();
+        
+        // Draw path
+        aiPath.forEach(point => {
+          ctx.lineTo(
+            (point.x + 0.5) * cellSizeValue,
+            (point.y + 0.5) * cellSizeValue
+          );
+        });
+        
+        ctx.stroke();
+      }
     }
     
     // Draw obstacles
@@ -229,83 +254,21 @@ const AIPlay = () => {
     const foodY = food.y * cellSizeValue + cellSizeValue / 2;
     ctx.arc(foodX, foodY, cellSizeValue / 2, 0, Math.PI * 2);
     ctx.fill();
+
+    // COMPLETELY NEW APPROACH FOR SNAKE RENDERING - USING DIFFERENT SHAPES
     
-    // Draw snake
-    snake.forEach((segment, index) => {
-      // Get animated position
-      const segX = segment.x * cellSizeValue;
-      const segY = segment.y * cellSizeValue;
-      
-      // Draw snake body
-      ctx.fillStyle = currentTheme.snake;
-      
-      // Head is slightly different
-      if (index === 0) {
-        // Create gradient for head
-        const headGradient = ctx.createLinearGradient(
-          segX, segY,
-          segX + cellSizeValue, segY + cellSizeValue
-        );
-        headGradient.addColorStop(0, currentTheme.snake);
-        headGradient.addColorStop(1, shadeColor(currentTheme.snake, 20));
-        ctx.fillStyle = headGradient;
+    // First, render all snake body segments as squares
+    if (snake.length > 1) { // Only if there are body segments
+      for (let i = 1; i < snake.length; i++) {
+        const segment = snake[i];
+        const segX = segment.x * cellSizeValue;
+        const segY = segment.y * cellSizeValue;
         
-        // Draw slightly larger head
-        ctx.fillRect(
-          segX - 2, 
-          segY - 2, 
-          cellSizeValue + 4, 
-          cellSizeValue + 4
-        );
-        
-        // Draw eyes
-        ctx.fillStyle = '#000000';
-        const eyeSize = cellSizeValue / 6;
-        const direction = snake.length > 1 
-          ? getDirectionFromSegments(segment, snake[1]) 
-          : 'RIGHT';
-        
-        let leftEyeX, leftEyeY, rightEyeX, rightEyeY;
-        
-        // Position eyes based on direction
-        switch (direction) {
-          case 'UP':
-            leftEyeX = segX + cellSizeValue / 4;
-            leftEyeY = segY + cellSizeValue / 4;
-            rightEyeX = segX + cellSizeValue * 3 / 4;
-            rightEyeY = segY + cellSizeValue / 4;
-            break;
-          case 'DOWN':
-            leftEyeX = segX + cellSizeValue / 4;
-            leftEyeY = segY + cellSizeValue * 3 / 4;
-            rightEyeX = segX + cellSizeValue * 3 / 4;
-            rightEyeY = segY + cellSizeValue * 3 / 4;
-            break;
-          case 'LEFT':
-            leftEyeX = segX + cellSizeValue / 4;
-            leftEyeY = segY + cellSizeValue / 4;
-            rightEyeX = segX + cellSizeValue / 4;
-            rightEyeY = segY + cellSizeValue * 3 / 4;
-            break;
-          case 'RIGHT':
-          default:
-            leftEyeX = segX + cellSizeValue * 3 / 4;
-            leftEyeY = segY + cellSizeValue / 4;
-            rightEyeX = segX + cellSizeValue * 3 / 4;
-            rightEyeY = segY + cellSizeValue * 3 / 4;
-            break;
-        }
-        
-        // Draw the eyes
-        ctx.beginPath();
-        ctx.arc(leftEyeX, leftEyeY, eyeSize, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.arc(rightEyeX, rightEyeY, eyeSize, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        // For body segments
+        // Body segments with alternating colors for visibility
+        ctx.fillStyle = i % 2 === 0 
+          ? currentTheme.snake 
+          : shadeColor(currentTheme.snake, -10);
+          
         ctx.fillRect(
           segX, 
           segY, 
@@ -313,9 +276,104 @@ const AIPlay = () => {
           cellSizeValue
         );
       }
-    });
+    }
     
-  }, [snake, food, obstacles, boardSize, currentTheme, aiPath, isPlaying]);
+    // Now, explicitly render the head as a circle (if it exists)
+    if (snake.length > 0) {
+      // Explicitly log the head for debugging
+      console.log("Rendering head:", snake[0]);
+      console.log("Animation properties:", {
+        x: snake[0].x,
+        y: snake[0].y,
+        animX: snake[0].animX,
+        animY: snake[0].animY,
+        prevX: snake[0].prevX,
+        prevY: snake[0].prevY
+      });
+      
+      const head = snake[0]; // Always treat the first element as the head
+      
+      // Use precise coordinates, ignoring animation values to ensure head is visible
+      const headCenterX = (head.x + 0.5) * cellSizeValue;
+      const headCenterY = (head.y + 0.5) * cellSizeValue;
+      const headRadius = cellSizeValue * 0.6; // Slightly larger than half a cell
+      
+      // Draw head circle with outer glow
+      ctx.beginPath();
+      ctx.arc(headCenterX, headCenterY, headRadius + 2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // White glow
+      ctx.fill();
+      
+      // Draw head main circle
+      ctx.beginPath();
+      ctx.arc(headCenterX, headCenterY, headRadius, 0, Math.PI * 2);
+      
+      // Create radial gradient for the head
+      const headGradient = ctx.createRadialGradient(
+        headCenterX, headCenterY, 0,
+        headCenterX, headCenterY, headRadius
+      );
+      headGradient.addColorStop(0, shadeColor(currentTheme.snake, 30));
+      headGradient.addColorStop(1, currentTheme.snake);
+      ctx.fillStyle = headGradient;
+      ctx.fill();
+      
+      // Draw eyes - position them based on direction
+      ctx.fillStyle = '#000000';
+      const eyeRadius = cellSizeValue * 0.15;
+      let leftEyeX, leftEyeY, rightEyeX, rightEyeY;
+      
+      // Calculate eye positions based on direction and head center
+      const eyeOffset = headRadius * 0.5;
+      
+      switch (direction) {
+        case 'UP':
+          leftEyeX = headCenterX - eyeOffset;
+          leftEyeY = headCenterY - eyeOffset * 0.5;
+          rightEyeX = headCenterX + eyeOffset;
+          rightEyeY = headCenterY - eyeOffset * 0.5;
+          break;
+        case 'DOWN':
+          leftEyeX = headCenterX - eyeOffset;
+          leftEyeY = headCenterY + eyeOffset * 0.5;
+          rightEyeX = headCenterX + eyeOffset;
+          rightEyeY = headCenterY + eyeOffset * 0.5;
+          break;
+        case 'LEFT':
+          leftEyeX = headCenterX - eyeOffset * 0.5;
+          leftEyeY = headCenterY - eyeOffset;
+          rightEyeX = headCenterX - eyeOffset * 0.5;
+          rightEyeY = headCenterY + eyeOffset;
+          break;
+        case 'RIGHT':
+        default:
+          leftEyeX = headCenterX + eyeOffset * 0.5;
+          leftEyeY = headCenterY - eyeOffset;
+          rightEyeX = headCenterX + eyeOffset * 0.5;
+          rightEyeY = headCenterY + eyeOffset;
+          break;
+      }
+      
+      // Draw the eyes
+      ctx.beginPath();
+      ctx.arc(leftEyeX, leftEyeY, eyeRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.arc(rightEyeX, rightEyeY, eyeRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Draw debug information
+    if (isPlaying && debugInfo.headPosition) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.font = '12px Arial';
+      ctx.fillText(`Snake Length: ${debugInfo.snakeLength}`, 10, 20);
+      ctx.fillText(`Head: (${debugInfo.headPosition.x}, ${debugInfo.headPosition.y})`, 10, 40);
+      ctx.fillText(`Direction: ${direction}`, 10, 60);
+    }
+    
+  }, [snake, food, obstacles, boardSize, currentTheme, aiPath, isPlaying, direction, debugInfo]);
 
   // Helper functions for rendering
   const shadeColor = (color: string, percent: number): string => {
@@ -335,11 +393,18 @@ const AIPlay = () => {
   
   // Determine direction between two segments
   const getDirectionFromSegments = (a: Coordinates, b: Coordinates): Direction => {
+    // a is the head, b is the next segment
+    // If head is to the left of the next segment, snake is moving left
     if (a.x < b.x) return 'LEFT';
+    // If head is to the right of the next segment, snake is moving right  
     if (a.x > b.x) return 'RIGHT';
+    // If head is above the next segment, snake is moving up
     if (a.y < b.y) return 'UP';
+    // If head is below the next segment, snake is moving down
     if (a.y > b.y) return 'DOWN';
-    return 'RIGHT'; // default
+    
+    // Use the current game direction as fallback
+    return direction;
   };
 
   // Handle resize
@@ -399,6 +464,18 @@ const AIPlay = () => {
     setAISnake(null);
     setAIPath([]);
   };
+
+  // Add a deeper diagnostics effect to track snake array changes
+  useEffect(() => {
+    if (snake.length > 0 && isPlaying) {
+      console.log('Snake update:', {
+        length: snake.length,
+        head: snake[0],
+        tail: snake[snake.length - 1],
+        fullSnake: [...snake]
+      });
+    }
+  }, [snake, isPlaying]);
 
   return (
     <motion.div

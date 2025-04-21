@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useGameStore } from '../store/gameStore';
+import { Howl } from 'howler';
 import GameControls from '../components/game/GameControls';
 import GameOverModal from '../components/game/GameOverModal';
-import { Howl } from 'howler';
 
 const Game = () => {
   const navigate = useNavigate();
