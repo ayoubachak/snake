@@ -322,77 +322,89 @@ const Game = () => {
     
     // Draw snake with animation
     snake.forEach((segment, index) => {
-      // Get animated position (or use actual position if animation properties not set)
-      const animX = segment.animX !== undefined ? segment.animX : segment.x;
-      const animY = segment.animY !== undefined ? segment.animY : segment.y;
-      
-      // Calculate position based on animation
-      const segX = animX * cellSizeValue;
-      const segY = animY * cellSizeValue;
-      
-      // Draw snake body
-      ctx.fillStyle = currentTheme.snake;
-      
-      // Make head slightly larger and add a subtle gradient effect
+      // Check if this is the head
       if (index === 0) {
-        // Create gradient for head
-        const headGradient = ctx.createLinearGradient(
-          segX, segY,
-          segX + cellSizeValue, segY + cellSizeValue
+        // IMPROVED HEAD RENDERING - Draw head as a circle with eyes
+        console.log("Rendering head:", segment);
+        
+        // CRUCIAL FIX: Use exact coordinates from head position, NOT animation values
+        const headCenterX = (segment.x + 0.5) * cellSizeValue;
+        const headCenterY = (segment.y + 0.5) * cellSizeValue;
+        const headRadius = cellSizeValue * 0.6; // Slightly larger than half a cell
+        
+        // Draw head outer glow
+        ctx.beginPath();
+        ctx.arc(headCenterX, headCenterY, headRadius + 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'; // White glow
+        ctx.fill();
+        
+        // Draw head main circle
+        ctx.beginPath();
+        ctx.arc(headCenterX, headCenterY, headRadius, 0, Math.PI * 2);
+        
+        // Create radial gradient for the head
+        const headGradient = ctx.createRadialGradient(
+          headCenterX, headCenterY, 0,
+          headCenterX, headCenterY, headRadius
         );
-        headGradient.addColorStop(0, currentTheme.snake);
-        headGradient.addColorStop(1, shadeColor(currentTheme.snake, 20));
+        headGradient.addColorStop(0, shadeColor(currentTheme.snake, 30));
+        headGradient.addColorStop(1, currentTheme.snake);
         ctx.fillStyle = headGradient;
+        ctx.fill();
         
-        ctx.fillRect(
-          segX - 1, 
-          segY - 1, 
-          cellSizeValue + 2, 
-          cellSizeValue + 2
-        );
-        
-        // Draw eyes
+        // Draw eyes based on direction
         ctx.fillStyle = '#000000';
-        
-        // Calculate eye positions based on direction
-        const eyeSize = cellSizeValue / 6;
+        const eyeRadius = cellSizeValue * 0.15;
         let leftEyeX, leftEyeY, rightEyeX, rightEyeY;
+        
+        // Calculate eye positions based on direction and head center
+        const eyeOffset = headRadius * 0.5;
         
         switch (direction) {
           case 'UP':
-            leftEyeX = segX + cellSizeValue / 4;
-            leftEyeY = segY + cellSizeValue / 4;
-            rightEyeX = segX + cellSizeValue * 3 / 4;
-            rightEyeY = segY + cellSizeValue / 4;
+            leftEyeX = headCenterX - eyeOffset;
+            leftEyeY = headCenterY - eyeOffset * 0.5;
+            rightEyeX = headCenterX + eyeOffset;
+            rightEyeY = headCenterY - eyeOffset * 0.5;
             break;
           case 'DOWN':
-            leftEyeX = segX + cellSizeValue / 4;
-            leftEyeY = segY + cellSizeValue * 3 / 4;
-            rightEyeX = segX + cellSizeValue * 3 / 4;
-            rightEyeY = segY + cellSizeValue * 3 / 4;
+            leftEyeX = headCenterX - eyeOffset;
+            leftEyeY = headCenterY + eyeOffset * 0.5;
+            rightEyeX = headCenterX + eyeOffset;
+            rightEyeY = headCenterY + eyeOffset * 0.5;
             break;
           case 'LEFT':
-            leftEyeX = segX + cellSizeValue / 4;
-            leftEyeY = segY + cellSizeValue / 4;
-            rightEyeX = segX + cellSizeValue / 4;
-            rightEyeY = segY + cellSizeValue * 3 / 4;
+            leftEyeX = headCenterX - eyeOffset * 0.5;
+            leftEyeY = headCenterY - eyeOffset;
+            rightEyeX = headCenterX - eyeOffset * 0.5;
+            rightEyeY = headCenterY + eyeOffset;
             break;
           case 'RIGHT':
-            leftEyeX = segX + cellSizeValue * 3 / 4;
-            leftEyeY = segY + cellSizeValue / 4;
-            rightEyeX = segX + cellSizeValue * 3 / 4;
-            rightEyeY = segY + cellSizeValue * 3 / 4;
+          default:
+            leftEyeX = headCenterX + eyeOffset * 0.5;
+            leftEyeY = headCenterY - eyeOffset;
+            rightEyeX = headCenterX + eyeOffset * 0.5;
+            rightEyeY = headCenterY + eyeOffset;
             break;
         }
         
+        // Draw the eyes
         ctx.beginPath();
-        ctx.arc(leftEyeX, leftEyeY, eyeSize, 0, Math.PI * 2);
+        ctx.arc(leftEyeX, leftEyeY, eyeRadius, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.beginPath();
-        ctx.arc(rightEyeX, rightEyeY, eyeSize, 0, Math.PI * 2);
+        ctx.arc(rightEyeX, rightEyeY, eyeRadius, 0, Math.PI * 2);
         ctx.fill();
       } else {
+        // Get animated position (or use actual position if animation properties not set)
+        const animX = segment.animX !== undefined ? segment.animX : segment.x;
+        const animY = segment.animY !== undefined ? segment.animY : segment.y;
+        
+        // Calculate position based on animation
+        const segX = animX * cellSizeValue;
+        const segY = animY * cellSizeValue;
+        
         // For body segments, create a subtle gradient based on position
         const bodyGradient = ctx.createLinearGradient(
           segX, segY,
