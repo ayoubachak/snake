@@ -75,7 +75,7 @@ export class HamiltonianAlgorithm implements PathfindingAlgorithm {
     };
   }
   
-  getNextDirection(snake: Coordinates[], currentDirection: Direction): Direction {
+  getNextDirection(snake: Coordinates[], _currentDirection: Direction): Direction {
     if (snake.length === 0 || this.cycle.length === 0) {
       return PathfindingUtils.getRandomDirection(
         snake[0], 
@@ -101,7 +101,7 @@ export class HamiltonianAlgorithm implements PathfindingAlgorithm {
     return PathfindingUtils.getDirectionFromPositions(head, nextPos);
   }
   
-  findPath(start: Coordinates, goal: Coordinates): Coordinates[] | null {
+  findPath(): Coordinates[] | null {
     // For Hamiltonian, we don't use direct pathfinding to the food
     // Instead, we follow the cycle with potential shortcuts
     return null;
@@ -249,4 +249,4 @@ export class HamiltonianAlgorithm implements PathfindingAlgorithm {
     // Safe to take a shortcut
     return true;
   }
-} 
+}

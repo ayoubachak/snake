@@ -66,28 +66,24 @@ const GameControls = ({ onDirectionChange }: GameControlsProps) => {
       <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
         <div className="col-start-2">
           <DirectionButton 
-            direction="UP" 
             icon="↑" 
             onClick={() => onDirectionChange('UP')} 
           />
         </div>
         <div className="col-start-1">
           <DirectionButton 
-            direction="LEFT" 
             icon="←" 
             onClick={() => onDirectionChange('LEFT')} 
           />
         </div>
         <div className="col-start-2">
           <DirectionButton 
-            direction="DOWN" 
             icon="↓" 
             onClick={() => onDirectionChange('DOWN')} 
           />
         </div>
         <div className="col-start-3">
           <DirectionButton 
-            direction="RIGHT" 
             icon="→" 
             onClick={() => onDirectionChange('RIGHT')} 
           />
@@ -101,12 +97,11 @@ const GameControls = ({ onDirectionChange }: GameControlsProps) => {
 };
 
 interface DirectionButtonProps {
-  direction: Direction;
   icon: string;
   onClick: () => void;
 }
 
-const DirectionButton = ({ direction, icon, onClick }: DirectionButtonProps) => {
+const DirectionButton = ({ icon, onClick }: DirectionButtonProps) => {
   return (
     <motion.button
       className="w-full h-16 flex items-center justify-center rounded-lg bg-gray-800 text-white text-3xl"
@@ -119,4 +114,4 @@ const DirectionButton = ({ direction, icon, onClick }: DirectionButtonProps) => 
   );
 };
 
-export default GameControls; 
+export default GameControls;

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useGameStore, Coordinates, Direction } from '../store/gameStore';
+import { useGameStore, Coordinates } from '../store/gameStore';
 import { AISnake } from '../services/aiSnake';
 import { Algorithm } from '../services/algorithms/AlgorithmFactory';
 
@@ -21,10 +21,8 @@ const AIPlay = () => {
     obstacles,
     score,
     gameStatus,
-    difficulty,
     boardSize,
     theme,
-    soundEnabled,
     moveSnake,
     startGame,
     pauseGame,
@@ -70,14 +68,7 @@ const AIPlay = () => {
   };
   
   const currentTheme = themes[theme];
-  
-  // Add animation frame tracker
-  const animationRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(0);
   const cellSize = useRef<number>(0);
-  
-  // Add state to force render
-  const [, forceRender] = useState(0);
   
   // Add algorithm choices
   const [algorithm, setAlgorithm] = useState<Algorithm>('astar');
@@ -167,7 +158,7 @@ const AIPlay = () => {
         setHamiltonianCycle(aiSnake.getHamiltonianCycle());
       }
       
-      const nextDirection = aiSnake.getNextDirection();
+      const nextDirection = aiSnake.getNextDirection(snake);
       if (nextDirection) {
         setDirection(nextDirection);
       }
@@ -483,22 +474,6 @@ const AIPlay = () => {
     ).toString(16).slice(1);
   };
   
-  // Determine direction between two segments
-  const getDirectionFromSegments = (a: Coordinates, b: Coordinates): Direction => {
-    // a is the head, b is the next segment
-    // If head is to the left of the next segment, snake is moving left
-    if (a.x < b.x) return 'LEFT';
-    // If head is to the right of the next segment, snake is moving right  
-    if (a.x > b.x) return 'RIGHT';
-    // If head is above the next segment, snake is moving up
-    if (a.y < b.y) return 'UP';
-    // If head is below the next segment, snake is moving down
-    if (a.y > b.y) return 'DOWN';
-    
-    // Use the current game direction as fallback
-    return direction;
-  };
-
   // Handle resize
   useEffect(() => {
     const handleResize = () => {

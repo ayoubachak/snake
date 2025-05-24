@@ -9,7 +9,6 @@ import GameOverModal from '../components/game/GameOverModal';
 const Game = () => {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [showControls, setShowControls] = useState(true);
   const [showGameOver, setShowGameOver] = useState(false);
   
   // Game state from store
@@ -31,7 +30,6 @@ const Game = () => {
     resetGame,
     setDirection,
     addHighScore,
-    animationInProgress,
   } = useGameStore();
   
   // Theme settings
@@ -148,7 +146,7 @@ const Game = () => {
     const snakeCopy = [...snake];
     
     // Update each segment's animated position
-    snakeCopy.forEach((segment, i) => {
+    snakeCopy.forEach((segment) => {
       if (segment.animX === undefined || segment.animY === undefined || 
           segment.prevX === undefined || segment.prevY === undefined) {
         // Initialize animation properties if not set
@@ -508,7 +506,6 @@ const Game = () => {
   const handleStartGame = () => {
     setShowGameOver(false);
     startGame();
-    setShowControls(false);
   };
   
   // Handle screen resize - with improved sizing
@@ -638,4 +635,4 @@ const Game = () => {
   );
 };
 
-export default Game; 
+export default Game;

@@ -9,11 +9,6 @@ interface AISnakeConfig {
 }
 
 export class AISnake {
-  private boardSize: number;
-  private obstacles: Coordinates[];
-  private snake: Coordinates[];
-  private food: Coordinates;
-  private algorithm: Algorithm = 'astar';
   private config: AISnakeConfig;
   private pathfinder: PathfindingAlgorithm;
   
@@ -25,12 +20,6 @@ export class AISnake {
     algorithm: Algorithm = 'astar',
     config?: AISnakeConfig
   ) {
-    this.boardSize = boardSize;
-    this.snake = [...snake];
-    this.food = { ...food };
-    this.obstacles = [...obstacles];
-    this.algorithm = algorithm;
-    
     // Set default config values if not provided
     this.config = {
       heuristicWeight: config?.heuristicWeight ?? 1.0,
@@ -50,25 +39,22 @@ export class AISnake {
 
   // Update AI state with new game state
   public update(snake: Coordinates[], food: Coordinates, obstacles: Coordinates[]): void {
-    this.snake = [...snake];
-    this.food = { ...food };
-    this.obstacles = [...obstacles];
-    
     // Update the pathfinder with new state
     this.pathfinder.update(snake, food, obstacles);
   }
 
   // Get next direction based on calculated path
-  public getNextDirection(): Direction {
-    return this.pathfinder.getNextDirection(this.snake, this.getCurrentDirection());
+  public getNextDirection(snake: Coordinates[]): Direction {
+    const currentDirection = this.getCurrentDirection(snake);
+    return this.pathfinder.getNextDirection(snake, currentDirection);
   }
 
   // Helper to get current direction based on snake position
-  private getCurrentDirection(): Direction {
-    if (this.snake.length < 2) return 'RIGHT'; // Default
+  private getCurrentDirection(snake: Coordinates[]): Direction {
+    if (snake.length < 2) return 'RIGHT'; // Default
     
-    const head = this.snake[0];
-    const neck = this.snake[1];
+    const head = snake[0];
+    const neck = snake[1];
     
     if (head.x < neck.x) return 'LEFT';
     if (head.x > neck.x) return 'RIGHT';
@@ -88,4 +74,4 @@ export class AISnake {
     const visualizationData = this.pathfinder.getVisualizationData();
     return visualizationData.hamiltonianCycle || [];
   }
-} 
+}

@@ -62,7 +62,7 @@ export class AStarAlgorithm implements PathfindingAlgorithm {
     return {};
   }
   
-  getNextDirection(snake: Coordinates[], currentDirection: Direction): Direction {
+  getNextDirection(snake: Coordinates[], _currentDirection: Direction): Direction {
     if (this.path.length === 0 || this.pathIndex >= this.path.length) {
       // No path available, use random direction
       return PathfindingUtils.getRandomDirection(
@@ -237,4 +237,4 @@ export class AStarAlgorithm implements PathfindingAlgorithm {
       return minDistanceToSnake > currentMinDistance ? move : safest;
     }, possibleMoves[0]);
   }
-} 
+}
