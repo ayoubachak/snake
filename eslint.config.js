@@ -14,6 +14,7 @@ export default tseslint.config(
       globals: globals.browser,
     },
     plugins: {
+      '@typescript-eslint': tseslint.plugin, // Ensure the plugin is explicitly available
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
     },
@@ -22,6 +23,17 @@ export default tseslint.config(
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
+      ],
+      '@typescript-eslint/no-unused-vars': [
+        'warn', // or 'error'
+        {
+          args: 'all',
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'all',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
       ],
     },
   },

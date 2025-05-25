@@ -369,22 +369,4 @@ export class HamiltonianAlgorithm implements PathfindingAlgorithm {
 
     return pathToTail !== null && pathToTail.length > 0;
   }
-  
-  private getEmptyNeighbors(pos: Coordinates, currentSnake: Coordinates[]): Coordinates[] {
-    const neighbors: Coordinates[] = [];
-    const directions = [ { x: 0, y: -1 },{ x: 1, y: 0 },{ x: 0, y: 1 },{ x: -1, y: 0 } ];
-    
-    for (const dir of directions) {
-      const newX = pos.x + dir.x;
-      const newY = pos.y + dir.y;
-      
-      if (!this.isCellValidForCycle(newX, newY)) continue; // Check bounds and obstacles
-      
-      const isOccupiedBySnake = currentSnake.some(seg => seg.x === newX && seg.y === newY);
-      if (!isOccupiedBySnake) {
-        neighbors.push({ x: newX, y: newY });
-      }
-    }
-    return neighbors;
-  }
 }
